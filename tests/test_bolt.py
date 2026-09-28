@@ -1,6 +1,7 @@
 """Tests for locks that report their bolt position (upgraded locks)."""
 
 from datetime import timedelta
+from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.lock import SERVICE_LOCK, SERVICE_UNLOCK, LockState
@@ -226,6 +227,92 @@ async def test_unlock_shows_unlocking_until_turned(
     # as the event is polled.
     set_events(aioclient_mock, [_bolt_event(10, "2026-09-24T12:00:08Z", "Unlocked")])
     await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+def _activation(event_id: int, time: str, **extra: Any) -> dict:
+    """A successful activation that lasts two minutes."""
+    return event_payload(
+        event_id,
+        "DeviceActivation",
+        time,
+        method="Button",
+        result="Success",
+        activationTime=120,
+        **extra,
+    )
+
+
+async def test_activated_while_unlocked_shows_locking(
+    hass: HomeAssistant,
+    upgraded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test activating an unlocked lock shows locking, until it's turned.
+
+    As happened: the button was pressed to lock the door, and it was turned
+    to locked well before the activation ended.
+    """
+    set_events(aioclient_mock, [_bolt_event(10, "2026-09-24T11:59:50Z", "Unlocked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+    set_events(aioclient_mock, [_activation(11, "2026-09-24T12:00:30Z")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
+
+    # Locked straight away, not when the activation ends at 12:02:30.
+    set_events(aioclient_mock, [_bolt_event(12, "2026-09-24T12:01:05Z", "Locked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKED
+
+
+async def test_turned_while_activated_shows_the_bolt(
+    hass: HomeAssistant,
+    upgraded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test a turned lock shows its bolt for the rest of the activation.
+
+    Even when the same activation is reported again afterwards, e.g. by the
+    event log after a push.
+    """
+    set_events(aioclient_mock, [_activation(10, "2026-09-24T12:00:20Z")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKING
+
+    set_events(aioclient_mock, [_bolt_event(11, "2026-09-24T12:00:40Z", "Unlocked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+    set_events(
+        aioclient_mock,
+        [
+            _activation(
+                12, "2026-09-24T12:00:25Z", keepActiveUntil="2026-09-24T12:03:00Z"
+            )
+        ],
+    )
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
+
+
+async def test_unlock_while_unlocked_shows_locking(
+    hass: HomeAssistant,
+    upgraded: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+) -> None:
+    """Test unlocking from Home Assistant, with the bolt open, readies it to lock."""
+    set_events(aioclient_mock, [_bolt_event(10, "2026-09-24T11:59:50Z", "Unlocked")])
+    await advance(hass, frozen_time, EVENT_SCAN_INTERVAL)
+    await call_lock(hass, SERVICE_UNLOCK)
+    assert hass.states.get(LOCK_ENTITY).state == LockState.LOCKING
+
+    # Not turned: back to unlocked when the activation ends.
+    await advance(hass, frozen_time, timedelta(seconds=15))
     assert hass.states.get(LOCK_ENTITY).state == LockState.UNLOCKED
 
 

@@ -79,7 +79,7 @@ Each lock gets:
 
 | Entity | What it does |
 |---|---|
-| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position show it: locked or unlocked, and unlocking while activated and waiting to be turned. Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
+| `lock.<lock>` | **Unlock** activates the lock. Locks that report their bolt position show it: locked or unlocked, and, while activated and waiting to be turned, unlocking (if it was locked) or locking (if it was unlocked). Other locks show as unlocked while activated and locked otherwise, as an assumed state. **Lock** ends an activation early. `changed_by` shows who last activated or deactivated it. |
 | `event.<lock>_activity` | Fires for activations (with how: PIN, button or Bluetooth, which covers the app, Home Assistant and a Bold Connect; and who, when Bold knows), failed activations such as a wrong PIN, deactivations, tamper alerts (including repeated wrong PINs), and, for locks that report their bolt position, the bolt being locked or unlocked. |
 | `sensor.<lock>_battery_level` | Battery level as Bold reports it: Excellent, High, Medium, Low or Critical. |
 | `binary_sensor.<lock>_battery` | Low battery: on when the level is Low or Critical. |

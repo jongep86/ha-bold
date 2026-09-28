@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 (unreleased)
+
+- A lock that reports its bolt, activated while unlocked, shows as locking
+  until it's turned, instead of unlocked, or unlocking once turned to locked.
+- Once a lock is turned during an activation, it shows the bolt's new position
+  straight away, rather than unlocking or locking until the activation ends.
+
 ## 1.0.0 (2026-09-26)
 
 The first release: a new integration for Bold Smart Locks, written from

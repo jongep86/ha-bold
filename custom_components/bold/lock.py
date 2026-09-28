@@ -110,6 +110,9 @@ class BoldLock(BoldEntity, LockEntity):
         self._unsub_expiry: CALLBACK_TYPE | None = None
         self._bolt_locked: bool | None = None
         self._bolt_changed: datetime | None = None
+        # The bolt's position when the current activation started: the lock
+        # will be turned the other way.
+        self._activation_bolt: bool | None = None
         self._update_from_device()
 
     async def async_added_to_hass(self) -> None:
@@ -190,9 +193,24 @@ class BoldLock(BoldEntity, LockEntity):
 
     @property
     def is_unlocking(self) -> bool:
-        """Return whether the lock is being activated, or ready to be turned."""
-        return bool(self._attr_is_unlocking) or (
-            self._reports_bolt and bool(self._bolt_locked) and self._is_active
+        """Return whether the lock is being activated, or ready to be unlocked."""
+        return bool(self._attr_is_unlocking) or self._waiting_to_turn(locked=True)
+
+    @property
+    def is_locking(self) -> bool:
+        """Return whether an activation is being ended, or it's ready to be locked."""
+        return bool(self._attr_is_locking) or self._waiting_to_turn(locked=False)
+
+    def _waiting_to_turn(self, *, locked: bool) -> bool:
+        """Return whether the lock is activated with the bolt as it started.
+
+        Once the bolt is turned, the activation has done its job.
+        """
+        return (
+            self._reports_bolt
+            and self._is_active
+            and self._activation_bolt is locked
+            and self._bolt_locked is locked
         )
 
     @property
@@ -226,7 +244,10 @@ class BoldLock(BoldEntity, LockEntity):
 
     async def _async_send_showing_progress(self, command_type: str) -> timedelta | None:
         """Send a command, showing the lock as unlocking or locking meanwhile."""
-        unlocking = command_type == COMMAND_ACTIVATE
+        # Activating an unlocked bolt lets it be turned to lock.
+        unlocking = command_type == COMMAND_ACTIVATE and not (
+            self._reports_bolt and self._bolt_locked is False
+        )
         self._attr_is_unlocking = unlocking
         self._attr_is_locking = not unlocking
         self.async_write_ha_state()
@@ -385,6 +406,9 @@ class BoldLock(BoldEntity, LockEntity):
         self._bolt_changed = changed or self._bolt_changed
 
     def _set_active(self, start: datetime, until: datetime) -> None:
+        if not self._is_active:
+            # A new activation, rather than a later report of the same one.
+            self._activation_bolt = self._bolt_locked
         self._activated_at = start
         self._active_until = until
         self._schedule_expiry()
