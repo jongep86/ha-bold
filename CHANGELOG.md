@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.1 (unreleased)
+## 1.0.1 (2026-09-28)
 
 - A lock that reports its bolt, activated while unlocked, shows as locking
   until it's turned, instead of unlocked, or unlocking once turned to locked.
