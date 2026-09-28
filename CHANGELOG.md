@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 (2026-09-28)
+
+- No changes to the integration. HACS now installs it from a zip attached to
+  each release, so it can show how many times it's been downloaded.
+
 ## 1.0.1 (2026-09-28)
 
 - A lock that reports its bolt, activated while unlocked, shows as locking
